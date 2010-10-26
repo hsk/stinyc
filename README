@@ -1,3 +1,7 @@
 STinyC is Tiny-C language compiler created by Scala language.
 
 Tiny-CコンパイラをScalaに移植してみるプロジェクトです。
+
+オリジナルのTiny-Cの講義のURLはこちら
+
+http://www.hpcs.cs.tsukuba.ac.jp/~msato/lecture-note/comp-lecture/
