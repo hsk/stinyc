@@ -1,24 +1,32 @@
+package stinyc;
+import scala.collection.mutable.Stack
+import java.io.FileReader
+
 /*
  * tiny-C interpreter header file
  */
 
-object InterP {
+object InterP extends Parser {
 	var envp = 0
 	val MAX_ENV = 100
-	class Environment(var vr:SymbolC, var vl:Int)
-	var env = Array[Environment](MAX_ENV)
+	case class Environment(var vr:SymbolC, var vl:Int)
+	var env = new Array[Environment](MAX_ENV)
 	var funcReturnVal = 0
-
-	def defineFunction(fsym:SymbolC, params:AST, body:AST) {
-		fsym.func_params = params
-		fsym.func_body = body
+	def init() {
+		for(i <- 0 until MAX_ENV) {
+			env(i) = Environment(null, 0)
+		}
+	}
+	override def defineFunction(fsym:stinyc.Ast#SymbolC, params:Ast#AST, body:stinyc.Ast#AST) {
+		fsym.setFuncParams(params.asInstanceOf[Ast.AST])
+		fsym.setFuncBody(body.asInstanceOf[Ast.AST])
 	}
 
 	/*
 	 * For environment
 	 */
 	def setValue(vr:SymbolC, vl:Int):Int = {
-	    val i = envp - 1
+	    var i = envp - 1
 
 		while (i >= 0) {
 			if(env(i).vr == vr) {
@@ -41,14 +49,12 @@ object InterP {
 	}
 
 	def executeCallFunc(f:SymbolC, args:AST):Int = {
-
-		val nargs = executeFuncArgs(f.func_params, args)
+		val nargs = executeFuncArgs(f.func_params.asInstanceOf[AST], args)
 		var vl = 0
-
 		try {
-			executeStatement(f.func_body)
+			executeStatement(f.func_body.asInstanceOf[AST])
 		} catch {
-		case Exception => vl = funcReturnVal
+		case _=> vl = funcReturnVal
 		}
 		envp -= nargs
 		vl
@@ -73,7 +79,7 @@ object InterP {
 	def executeStatement(p:AST) {
 		p match {
 		case BLOCK_STATEMENT(l, r) => executeBlock(l, r)
-		case RETURN_STATEMENT(l, _) => executeReturn(l)
+		case RETURN_STATEMENT(l) => executeReturn(l)
 		case IF_STATEMENT(l, r) => executeIf(l, getNth(r, 0), getNth(r, 1))
 		case WHILE_STATEMENT(l, r) => executeWhile(l, r)
 		case FOR_STATEMENT(l, r) => executeFor(getNth(l, 0), getNth(l, 1), getNth(l, 2), r)
@@ -90,15 +96,16 @@ object InterP {
 			env(ep).vr = getSymbol(getFirst(vars))
 			vars = getNext(vars)
 		}
-		while (statements != null) {
-			executeStatement(getFirst(statements))
-			statements = getNext(statements)
+		var st = statements
+		while (st != null) {
+			executeStatement(getFirst(st))
+			st = getNext(st)
 		}
 		envp = envp_save
 	}
 
 	def executeIf(cond:AST, then_part:AST, else_part:AST) {
-		if (executeExpr(cond)) {
+		if (executeExpr(cond) != 0) {
 			executeStatement(then_part)
 		} else {
 			executeStatement(else_part)
@@ -106,7 +113,7 @@ object InterP {
 	}
 
 	def executeWhile(cond:AST, body:AST) {
-		while (executeExpr(cond)) {
+		while (executeExpr(cond) != 0) {
 			executeStatement(body)
 		}
 	}
@@ -117,14 +124,15 @@ object InterP {
 
 	def executeExpr(p:AST):Int = {
 		p match {
+		case STR(s) => 0
 		case NUM(v) => v
 		case SYM(_) => getValue(getSymbol(p))
 		case EQ_OP(l, r) => setValue(getSymbol(l), executeExpr(r))
 		case PLUS_OP(l, r) => executeExpr(l) + executeExpr(r)
 		case MINUS_OP(l, r) => executeExpr(l) - executeExpr(r)
 		case MUL_OP(l, r) => executeExpr(l) * executeExpr(r)
-		case LT_OP(l, r) => executeExpr(l) < executeExpr(r)
-		case GT_OP(l, r) => executeExpr(l) > executeExpr(r)
+		case LT_OP(l, r) => if (executeExpr(l) < executeExpr(r)) -1 else 0
+		case GT_OP(l, r) => if (executeExpr(l) > executeExpr(r)) -1 else 0
 		case GET_ARRAY_OP(l, r) => getArray(executeExpr(l),executeExpr(r))
 		case SET_ARRAY_OP(l, r) => setArray(executeExpr(getNth(l, 0)),
 				executeExpr(getNth(l, 1)),
@@ -137,33 +145,47 @@ object InterP {
 	}
 
 	private def printFunc(args:AST) {
-		printf((char *)executeExpr(getNth(args,0)),
-			executeExpr(getNth(args,1)))
-		println()
+		println(executeExpr(getNth(args,0)) + executeExpr(getNth(args,1)))
 	}
 
 	/**
 	 * global variable
 	 */
-	def declareVariable(vsym:SymbolC, init_value:AST) {
+	override def declareVariable(vsym:stinyc.Ast#SymbolC, init_value:stinyc.Ast#AST) {
+		println("declareVariable");
 		if (init_value != null) {
-			vsym.vl = executeExpr(init_value)
+			vsym.vl = executeExpr(init_value.asInstanceOf[AST])
 		}
 	}
 
+	var arrays = new Stack[Array[Int]]()
 	/**
 	 * Array
 	 */
-	def declareArray(a:SymbolC, size:AST) {
-		a.vl = Array[Int](executeExpr(size))
+	override def declareArray(a:stinyc.Ast#SymbolC, size:stinyc.Ast#AST) {
+		a.vl = arrays.length
+		arrays.push(new Array[Int](executeExpr(size.asInstanceOf[AST])))
+		
 	}
 
-	def getArray(a:Array[Int], int index):Int = {
-		a(index)
+	def getArray(a:Int, index:Int):Int = {
+		arrays(a)(index)
 	}
-	def setArray(a:Array[Int], index:Int, value:Int):Int = {
-		a(index) = value
+	def setArray(a:Int, index:Int, value:Int):Int = {
+		arrays(a)(index) = value
 		value
+	}
+
+	def main(args:Array[String]) {
+		init()
+		var r = new FileReader(args(0));
+	    lexer = new CLex(r, this);
+		yyparse();
+		// execute main
+		println("execute main ...")
+		val r2 = executeCallFunc(getSymbol(makeSymbol("main")), null)
+		println("execute end ...")
+		println( r2)
 	}
 
 }

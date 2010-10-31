@@ -1,17 +1,6 @@
 import java.io.InputStream
 
 object CLex {
-	val EOF = 255
-	val STRING = 256
-	val NUMBER = 257
-	val VAR = 258
-	val IF = 259
-	val ELSE = 260
-	val RETURN = 261
-	val WHILE = 262
-	val FOR = 263
-	val PRINTLN = 264
-	val SYMBOL = 265
 
 	var yyval:AST.AST = null
 	var yytext:String = ""
@@ -68,7 +57,7 @@ object CLex {
 				}
 			}
 			yyval = AST.STR(yytext)
-			STRING
+			Parser.STRING
 		case _ if (isdigit(c)) =>
 			var n = 0
 			do {
@@ -77,7 +66,7 @@ object CLex {
 			} while(isdigit(c))
 			ungetChar(c)
 			yyval = AST.NUM(n)
-			NUMBER
+			Parser.NUMBER
 		case _  if(isalpha(c)) =>
 			yytext = ""
 			do {
@@ -86,14 +75,14 @@ object CLex {
 			} while(isalpha(c))
 			ungetChar(c)
 			yytext match {
-			case "var" => VAR
-			case "if" => IF
-			case "else" => ELSE
-			case "return" => RETURN
-			case "while" => WHILE
-			case "for" => FOR
-			case "println" => PRINTLN
-			case _ => yyval = AST.makeSymbol(yytext); SYMBOL
+			case "var" => Parser.VAR
+			case "if" => Parser.IF
+			case "else" => Parser.ELSE
+			case "return" => Parser.RETURN
+			case "while" => Parser.WHILE
+			case "for" => Parser.FOR
+			case "println" => Parser.PRINTLN
+			case _ => yyval = AST.makeSymbol(yytext); Parser.SYMBOL
 			}
 		case _ => throw new Exception("bad char '" + c + "'")
 		}

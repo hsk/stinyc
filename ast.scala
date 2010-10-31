@@ -1,8 +1,15 @@
-object AST {
+package stinyc;
+import scala.collection.mutable.Map;
+
+	object Ast extends Ast
+ class Ast {
 	case class SymbolC(var name:String) {
 		var vl:Int = 0
-		var func_params:AST = null
-		var func_body:AST = null
+		var array:Array[Int] = null
+		var func_params:Ast.AST = null
+		var func_body:Ast.AST = null
+		def setFuncParams(a:Ast.AST){func_params = a}
+		def setFuncBody(a:Ast.AST){func_body = a}
 	}
 
 	sealed abstract class AST
@@ -19,10 +26,10 @@ object AST {
 	case class GET_ARRAY_OP(l:AST,r:AST) extends AST
 	case class SET_ARRAY_OP(l:AST,r:AST) extends AST
 	case class CALL_OP(l:AST,r:AST) extends AST
-	case class PRINTLN_OP(l:AST,r:AST) extends AST
+	case class PRINTLN_OP(l:AST) extends AST
 	case class IF_STATEMENT(l:AST,r:AST) extends AST
 	case class BLOCK_STATEMENT(l:AST,r:AST) extends AST
-	case class RETURN_STATEMENT(l:AST,r:AST) extends AST
+	case class RETURN_STATEMENT(l:AST) extends AST
 	case class WHILE_STATEMENT(l:AST,r:AST) extends AST
 	case class FOR_STATEMENT(l:AST,r:AST) extends AST
 
@@ -53,13 +60,20 @@ object AST {
 		case _ => throw new Exception("bad access to list")
 		}
 	}
-
-	def makeSymbol(name:String):AST = SYM(SymbolC(name))
-
+	val symbolTable = Map[String, SymbolC]()
+	def makeSymbol(name:String):AST = {
+		if (symbolTable.contains(name)) {
+			SYM(symbolTable(name))
+		}else {
+			val sym = SymbolC(name)
+			symbolTable += ( name -> sym )
+			SYM(sym)
+		}
+	}
 	def getSymbol(p:AST):SymbolC = {
 		p match {
 		case SYM(s) => s
-		case _ => throw new Exception("bad access to symbol")
+		case _ => throw new Exception("bad access to symbol" + p)
 		}
 	}
 }
