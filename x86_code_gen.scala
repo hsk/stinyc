@@ -379,7 +379,7 @@ object Main extends Parser {
 				val rr = getReg(r)
 				tmpRegSave(i) = -1
 				// load into regsiter
-				println("\tmovl\t" + TMP_OFF(i) + "(%%ebp)," + tmpRegName(rr))
+				println("\tmovl\t" + TMP_OFF(i) + "(%ebp)," + tmpRegName(rr))
 				return rr
 			}
 		}
@@ -394,7 +394,7 @@ object Main extends Parser {
 		if(tmpRegState(reg) < 0) return
 		for (i <- 0 until N_SAVE) {
 			if (tmpRegSave(i) < 0) {
-				println("\tmovl\t%s,%d(%%ebp)\n",tmpRegName(reg),TMP_OFF(reg))
+				println("\tmovl\t" + tmpRegName(reg) + "," + TMP_OFF(reg) + "(%ebp)")
 				tmpRegSave(i) = tmpRegState(reg)
 				tmpRegState(reg) = -1
 				return
@@ -417,18 +417,18 @@ object Main extends Parser {
 		// function header
 		println("\t.text")								// .text
 		println("\t.align\t4")							// .align 4
-		println("\t.globl\t%s\n", entry_name)			// .globl <name>
-		println("\t.type\t%s,@function\n", entry_name)	// .type <name>,@function
-		println("%s:\n", entry_name)					// <name>:
-		println("\tpushl\t%%ebp\n")
-		println("\tmovl\t%%esp,%%ebp\n")
+		println("\t.globl\t"+ entry_name)			// .globl <name>
+		println("\t.type\t" + entry_name + ",@function")	// .type <name>,@function
+		println(entry_name + ":")					// <name>:
+		println("\tpushl\t%ebp")
+		println("\tmovl\t%esp,%ebp")
 
 		val frame_size = -LOCAL_VAR_OFF(n_local);
 		val ret_lab = label_counter
 		label_counter += 1
 
-		println("\tsubl\t$" + frame_size + ",%%esp")
-		println("\tmovl\t%%ebx,-4(%%ebp)")
+		println("\tsubl\t$" + frame_size + ",%esp")
+		println("\tmovl\t%ebx,-4(%ebp)")
 
 		initTmpReg()
 
@@ -443,21 +443,21 @@ object Main extends Parser {
 			case LOADA(opd1, opd2) =>	// load arg
 			    if(opd1 >= 0) {
 					val r = getReg(opd1);
-					println("\tmovl\t" + ARG_OFF(opd2) + "(%%ebp)," + tmpRegName(r));
+					println("\tmovl\t" + ARG_OFF(opd2) + "(%ebp)," + tmpRegName(r));
 				}
 			case LOADL(opd1, opd2) =>	// load local
 				if(opd1 >= 0) {
 					val r = getReg(opd1)
-					println("\tmovl\t" + LOCAL_VAR_OFF(opd2) + "(%%ebp)," + tmpRegName(r))
+					println("\tmovl\t" + LOCAL_VAR_OFF(opd2) + "(%ebp)," + tmpRegName(r))
 				}
 			case STOREA(opd1, opd2) =>	// store arg
 				val r = useReg(opd1)
 				freeReg(r)
-				println("\tmovl\t" + tmpRegName(r) + "," + ARG_OFF(opd2) + "(%%ebp)")
+				println("\tmovl\t" + tmpRegName(r) + "," + ARG_OFF(opd2) + "(%ebp)")
 			case STOREL(opd1, opd2) =>	// store local
 				val r = useReg(opd1)
 				freeReg(r)
-				println("\tmovl\t" + tmpRegName(r) + "," + LOCAL_VAR_OFF(opd2) + "(%%ebp)")
+				println("\tmovl\t" + tmpRegName(r) + "," + LOCAL_VAR_OFF(opd2) + "(%ebp)")
 			case BEQ0(opd1, opd2) => // conditional branch
 				val r = useReg(opd1)
 				freeReg(r)
@@ -473,7 +473,7 @@ object Main extends Parser {
 				println("\tcall\t" + opds)
 				if (opd1 >= 0) {
 					assignReg(opd1, REG_AX)
-					println("\tadd $" + (opd2 * 4) + ",%%esp")
+					println("\tadd $" + (opd2 * 4) + ",%esp")
 				}
 			case ARG(opd1) =>
 				val r = useReg(opd1)
@@ -483,7 +483,7 @@ object Main extends Parser {
 				val r = useReg(opd1)
 				freeReg(r)
 				if (r != REG_AX) {
-					println("\tmovl\t" + tmpRegName(r) + ",%%eax")
+					println("\tmovl\t" + tmpRegName(r) + ",%eax")
 				}
 				println("\tjmp .L" + ret_lab)
 
@@ -561,12 +561,12 @@ object Main extends Parser {
 				println("\tpushl\t$.LC" + opd2)
 				saveAllRegs()
 				println("\tcall\tprintln")
-				println("\taddl\t$8,%%esp")
+				println("\taddl\t$8,%esp")
 			}
 		}
 
 		// return sequence
-		println(".L" + ret_lab + ":\tmovl\t-4(%%ebp), %%ebx")
+		println(".L" + ret_lab + ":\tmovl\t-4(%ebp), %ebx")
 		println("\tleave")
 		println("\tret")
 	}
