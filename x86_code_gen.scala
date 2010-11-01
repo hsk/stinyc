@@ -407,75 +407,76 @@ object Main extends Parser {
 	def genFuncCode(entry_name:String, n_local:Int) {
 
 		// function header
-		println("\t.text")								// .text
-		println("\t.align\t4")							// .align 4
-		println("\t.globl\t"+ entry_name)			// .globl <name>
-		println("\t.type\t" + entry_name + ",@function")	// .type <name>,@function
-		println(entry_name + ":")					// <name>:
-		println("\tpushl\t%ebp")
-		println("\tmovl\t%esp,%ebp")
+		asm.text()
+		asm.align(4)
+		asm.globl(entry_name)
+		asm.type(entry_name, "@function")
+		asm.label(entry_name)
+		
+		asm.pushl("%ebp")
+		asm.movl("%esp", "%ebp")
 
-		val frame_size = -LOCAL_VAR_OFF(n_local);
+		val frame_size = -LOCAL_VAR_OFF(n_local)
 		val ret_lab = label_counter
 		label_counter += 1
 
-		println("\tsubl\t$" + frame_size + ",%esp")
-		println("\tmovl\t%ebx,-4(%ebp)")
+		asm.subl("$" . frame_size, "%esp")
+		asm.movl("%ebx", "-4(%ebp)")
 
 		initTmpReg()
 
 		codes foreach {
 		case LOADI(opd1, opd2) =>
 			if(opd1 >= 0) {
-				val r = getReg(opd1);
-				println("\tmovl\t$" + opd2 + ","+ tmpRegName(r))
+				val r = getReg(opd1)
+				asm.movl("$" + opd2, tmpRegName(r))
 			}
 		case LOADA(opd1, opd2) =>	// load arg
 		    if(opd1 >= 0) {
-				val r = getReg(opd1);
-				println("\tmovl\t" + ARG_OFF(opd2) + "(%ebp)," + tmpRegName(r));
+				val r = getReg(opd1)
+				asm.movl(ARG_OFF(opd2) + "(%ebp)", tmpRegName(r))
 			}
 		case LOADL(opd1, opd2) =>	// load local
 			if(opd1 >= 0) {
 				val r = getReg(opd1)
-				println("\tmovl\t" + LOCAL_VAR_OFF(opd2) + "(%ebp)," + tmpRegName(r))
+				asm.movl(LOCAL_VAR_OFF(opd2) + "(%ebp)", tmpRegName(r))
 			}
 		case STOREA(opd1, opd2) =>	// store arg
 			val r = useReg(opd1)
 			freeReg(r)
-			println("\tmovl\t" + tmpRegName(r) + "," + ARG_OFF(opd2) + "(%ebp)")
+			asm.movl(tmpRegName(r), ARG_OFF(opd2) + "(%ebp)")
 		case STOREL(opd1, opd2) =>	// store local
 			val r = useReg(opd1)
 			freeReg(r)
-			println("\tmovl\t" + tmpRegName(r) + "," + LOCAL_VAR_OFF(opd2) + "(%ebp)")
+			asm.movl(tmpRegName(r), LOCAL_VAR_OFF(opd2) + "(%ebp)")
 		case BEQ0(opd1, opd2) => // conditional branch
 			val r = useReg(opd1)
 			freeReg(r)
-			println("\tcmpl\t$0," + tmpRegName(r))
-			println("\tje\t.L" + opd2)
+			asm.cmpl("$0", tmpRegName(r))
+			asm.je(".L" + opd2)
 		case LABEL(opd1) =>
-		    println(".L" + opd1 + ":")
+			asm.label(".L" + opd1)
 		case JUMP(opd1) =>
-		    println("\tjmp\t.L" + opd1)
+			asm.jmp(".L" + opd1)
 
 		case CALL(opd1, opd2, opds) =>
 			saveAllRegs()
-			println("\tcall\t" + opds)
+			asm.call(opds)
 			if (opd1 >= 0) {
 				assignReg(opd1, REG_AX)
-				println("\tadd $" + (opd2 * 4) + ",%esp")
+				asm.add("$" + (opd2 * 4), "%esp")
 			}
 		case ARG(opd1) =>
 			val r = useReg(opd1)
 			freeReg(r)
-			println("\tpushl " + tmpRegName(r))
+			asm.pushl(tmpRegName(r))
 		case RET(opd1) =>
 			val r = useReg(opd1)
 			freeReg(r)
 			if (r != REG_AX) {
-				println("\tmovl\t" + tmpRegName(r) + ",%eax")
+				asm.movl(tmpRegName(r), "%eax")
 			}
-			println("\tjmp .L" + ret_lab)
+			asm.jmp(".L" + ret_lab)
 
 		case ADD(opd1, opd2, opd3) =>
 			val r1 = useReg(opd2)
@@ -484,7 +485,7 @@ object Main extends Parser {
 			freeReg(r2)
 			if (opd1 >= 0) {
 				assignReg(opd1,r1)
-				println("\taddl\t" + tmpRegName(r2) + "," + tmpRegName(r1))
+				asm.addl(tmpRegName(r2), tmpRegName(r1))
 			}
 		case SUB(opd1, opd2, opd3) =>
 			val r1 = useReg(opd2)
@@ -493,7 +494,7 @@ object Main extends Parser {
 			freeReg(r2)
 			if (opd1 >= 0) {
 				assignReg(opd1, r1)
-				println("\tsubl\t" + tmpRegName(r2) + "," + tmpRegName(r1))
+				asm.subl(tmpRegName(r2), tmpRegName(r1))
 			}
 		case MUL(opd1, opd2, opd3) =>
 			val r1 = useReg(opd2)
@@ -504,9 +505,9 @@ object Main extends Parser {
 				assignReg(opd1, REG_AX)
 				saveReg(REG_DX)
 				if(r1 != REG_AX) {
-					println("\tmovl " + tmpRegName(r1) + "," + tmpRegName(REG_AX))
+					asm.movl(tmpRegName(r1), tmpRegName(REG_AX))
 				}
-				println("\timull\t" + tmpRegName(r2) + "," + tmpRegName(REG_AX))
+				asm.imull(tmpRegName(r2), tmpRegName(REG_AX))
 			}
 		case LT(opd1, opd2, opd3) =>
 			val r1 = useReg(opd2)
@@ -519,12 +520,13 @@ object Main extends Parser {
 				label_counter += 1
 				val l2 = label_counter
 				label_counter += 1
-				println("\tcmpl\t" + tmpRegName(r2) + "," + tmpRegName(r1))
-				println("\tjl .L" + l1)
-				println("\tmovl\t$0," + tmpRegName(r))
-				println("\tjmp .L" + l2);
-				println(".L" + l1 + ":\tmovl\t$1," + tmpRegName(r))
-				print(".L" + l2 + ":")
+				asm.cmpl(tmpRegName(r2), tmpRegName(r1))
+				asm.jl(".L" + l1)
+				asm.movl("$0", tmpRegName(r))
+				asm.jmp(".L" + l2)
+				asm.label(".L" + l1)
+				asm.movl("$1", tmpRegName(r))
+				asm.label(".L" + l2)
 			}
 		case GT(opd1, opd2, opd3) =>
 			val r1 = useReg(opd2)
@@ -538,26 +540,28 @@ object Main extends Parser {
 				val l2 = label_counter
 				label_counter += 1
 
-				println("\tcmpl\t" + tmpRegName(r2) + "," + tmpRegName(r1))
-				println("\tjg .L" + l1)
-				println("\tmovl\t$0," + tmpRegName(r))
-				println("\tjmp .L" + l2)
-				println(".L" + l1 + ":\tmovl\t$1," + tmpRegName(r))
-				print(".L" + l2 + ":")
+				asm.cmpl(tmpRegName(r2), tmpRegName(r1))
+				asm.jg(".L" + l1)
+				asm.movl("$0", tmpRegName(r))
+				asm.jmp(".L" + l2)
+				asm.label(".L" + l1)
+				asm.movl("$1", tmpRegName(r))
+				asm.label(".L" + l2)
 			}
 		case PRINTLN(opd1, opd2) =>
 			val r = useReg(opd1); freeReg(r)
-			println("\tpushl\t" + tmpRegName(r))
-			println("\tpushl\t$.LC" + opd2)
+			asm.pushl(tmpRegName(r))
+			asm.pushl("$.LC" + opd2)
 			saveAllRegs()
-			println("\tcall\tprintln")
-			println("\taddl\t$8,%esp")
+			asm.call("println")
+			asm.addl("$8", "%esp")
 		}
 
 		// return sequence
-		println(".L" + ret_lab + ":\tmovl\t-4(%ebp), %ebx")
-		println("\tleave")
-		println("\tret")
+		asm.label(".L" + ret_lab)
+		asm.movl("-4(%ebp)", "%ebx")
+		asm.leave()
+		asm.ret()
 	}
 
 	def genString(s:String):Int = {
@@ -567,5 +571,66 @@ object Main extends Parser {
 		println(".LC" + l + ":")
 		println("\t.string \"" + s + "\"")
 		l
+	}
+}
+
+object asm {
+	def text() {
+		println("\t.text")
+	}
+	def align(r1:Int) {
+		println("\t.align\t" + r1)
+	}
+
+	def globl(r1:String) {
+		println("\t.globl\t"+ r1)					// .globl <name>
+	}
+	def type(r1:String, r2:String) {
+		println("\t.type\t" + r1 + "," + r2)
+	}
+	def label(r1:String) {
+		println(r1 + ":")							// <name>:
+	}
+	def pushl(r1:String) {
+		println("\tpushl\t" + r1)
+	}
+	def movl(r1:String, r2:String) {
+		println("\tmovl\t" + r1 + "," + r2)
+	}
+	def addl(r1:String, r2:String) {
+		println("\taddl\t" + r1 + "," + r2)
+	}
+	def subl(r1:String, r2:String) {
+		println("\tsubl\t" + r1 + "," + r2)
+	}
+	def cmpl(r1:String, r2:String) {
+		println("\tcmpl\t" + r1 + "," + r2)
+	}
+	def je(r1:String) {
+		println("\tje\t" + r1)
+	}
+	def jl(r1:String) {
+		println("\tjl\t" + r1)
+	}
+	def jg(r1:String) {
+		println("\tjg\t" + r1)
+	}
+	def jmp(r1:String) {
+		println("\tjmp\t" + r1)
+	}
+	def call(opds:String) {
+		println("\tcall\t" + opds)
+	}
+	def add(r1:String, r2:String) {
+		println("\tadd " + r1 + "," + r2)
+	}
+	def imull(r1:String, r2:String) {
+		println("\timull\t" + r1 + "," + r2)
+	}
+	def leave() {
+		println("\tleave")
+	}
+	def ret() {
+		println("\tret")
 	}
 }
