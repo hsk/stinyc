@@ -32,82 +32,77 @@ case class STORE() extends IR
 */
 
 object Main extends Parser {
-	val VAR_ARG = 0
-	val VAR_LOCAL = 1
-	val MAX_ENV = 100
 
-	class Environment(var vr:SymbolC, var vr_kind:Int, var pos:Int)
+	sealed class EnvKind()
+	case class EnvVarARG() extends EnvKind
+	case class EnvVarLocal() extends EnvKind
+	
+	case class Environment(var vr:SymbolC, var vr_kind:EnvKind, var pos:Int)
 
 
 
 
 	def main(args:Array[String]) {
-		var r = new FileReader(args(0));
-	    lexer = new CLex(r, this);
-	    init();
-	    yyparse()
-	    return 0
+		val r = new FileReader(args(0));
+		lexer = new CLex(r, this);
+		yyparse()
 	}
 
-
-	var envp = 0
-	var env = new Array[Environment](MAX_ENV)
-
+	var env = List[Environment]()
+	
 	var label_counter = 0
 	var local_var_pos = 0
 	var tmp_counter = 0
-	def init() {
-		for (i <- 0 until MAX_ENV) {
-			env(i) = new Environment(null,0,0)
-		}
-	}
+
 	def compileStoreVar(vr:SymbolC, r:Int) {
-		var i = envp - 1
-		while(i >= 0){
-			if (env(i).vr == vr){
-				env(i).vr_kind match {
-				case VAR_ARG => return genCode(STOREA(r, env(i).pos))
-				case VAR_LOCAL => return genCode(STOREL(r, env(i).pos))
-				}
+		def t(env:List[Environment]) {
+			env match {
+			case List() => throw new Exception("undefined variable\n")
+			case x::xs =>
+				if (x.vr == vr) {
+					x.vr_kind match {
+					case EnvVarARG() => genCode(STOREA(r, x.pos))
+					case EnvVarLocal() => genCode(STOREL(r, x.pos))
+					}
+				} else t(xs)
 			}
-			i -= 1
 		}
-		throw new Exception("undefined variable\n")
+		t(env)
 	}
 
 	def compileLoadVar(target:Int, vr:SymbolC) {
-		var i = envp - 1
-		while (i >= 0) {
-			if (env(i).vr == vr){
-				env(i).vr_kind match {
-				case VAR_ARG => genCode(LOADA(target, env(i).pos)); return
-				case VAR_LOCAL => genCode(LOADL(target, env(i).pos)); return
-				}
+		def t(env:List[Environment]) {
+			env match {
+			case List() => throw new Exception("undefined variable")
+			case x::xs =>
+				if (x.vr == vr) {
+					x.vr_kind match {
+					case EnvVarARG() => genCode(LOADA(target, x.pos))
+					case EnvVarLocal() => genCode(LOADL(target, x.pos))
+					}
+				} else t(xs)
 			}
-			i -= 1
 		}
-		throw new Exception("undefined variable\n")
+		t(env)
 	}
 
 	override def defineFunction(fsym:stinyc.Ast#SymbolC, params:Ast#AST, body:stinyc.Ast#AST) {
 
 		initGenCode()
-		envp = 0
-		var param_pos = 0
 		local_var_pos = 0
-
-		var ps = params.asInstanceOf[AST]
-		while (ps != null) {
-			env(envp).vr = getSymbol(getFirst(ps))
-			env(envp).vr_kind = VAR_ARG
-			env(envp).pos = param_pos
-			param_pos += 1
-			envp += 1
-			ps = getNext(ps)
+		
+		def getEnv(ps:AST, param_pos:Int, env:List[Environment]):List[Environment] = {
+			if (ps == null) env
+			else getEnv(
+				getNext(ps),
+				param_pos + 1,
+				Environment(getSymbol(getFirst(ps)), EnvVarARG(), param_pos)::env
+			)
 		}
+		env = getEnv(params.asInstanceOf[AST], 0, List[Environment]())
 		compileStatement(body.asInstanceOf[AST])
 		genFuncCode(fsym.name, local_var_pos)
-		envp = 0  // reset
+		env = List[Environment]() // reset
 	}
 
 	def compileStatement(p:AST) {
@@ -123,14 +118,11 @@ object Main extends Parser {
 	}
 
 	def compileBlock(local_vars:AST, statements:AST) {
-		val envp_save = envp
+		val env_save = env
 		var lv = local_vars
 		while (lv != null) {
-			env(envp).vr = getSymbol(getFirst(lv))
-			env(envp).vr_kind = VAR_LOCAL
-			env(envp).pos = local_var_pos
+			env = Environment(getSymbol(getFirst(lv)), EnvVarLocal(), local_var_pos)::env
 			local_var_pos += 1
-			envp += 1
 			lv = getNext(lv)
 		}
 		var st = statements
@@ -138,7 +130,7 @@ object Main extends Parser {
 			compileStatement(getFirst(st))
 			st = getNext(st)
 		}
-		envp = envp_save
+		env = env_save
 	}
 
 	def compileReturn(expr:AST) {
@@ -432,137 +424,134 @@ object Main extends Parser {
 
 		initTmpReg()
 
-		codes foreach {case code@_ =>
-			// debug println(code)
-			code match {
-			case LOADI(opd1, opd2) =>
-				if(opd1 >= 0) {
-					val r = getReg(opd1);
-					println("\tmovl\t$" + opd2 + ","+ tmpRegName(r))
-				}
-			case LOADA(opd1, opd2) =>	// load arg
-			    if(opd1 >= 0) {
-					val r = getReg(opd1);
-					println("\tmovl\t" + ARG_OFF(opd2) + "(%ebp)," + tmpRegName(r));
-				}
-			case LOADL(opd1, opd2) =>	// load local
-				if(opd1 >= 0) {
-					val r = getReg(opd1)
-					println("\tmovl\t" + LOCAL_VAR_OFF(opd2) + "(%ebp)," + tmpRegName(r))
-				}
-			case STOREA(opd1, opd2) =>	// store arg
-				val r = useReg(opd1)
-				freeReg(r)
-				println("\tmovl\t" + tmpRegName(r) + "," + ARG_OFF(opd2) + "(%ebp)")
-			case STOREL(opd1, opd2) =>	// store local
-				val r = useReg(opd1)
-				freeReg(r)
-				println("\tmovl\t" + tmpRegName(r) + "," + LOCAL_VAR_OFF(opd2) + "(%ebp)")
-			case BEQ0(opd1, opd2) => // conditional branch
-				val r = useReg(opd1)
-				freeReg(r)
-				println("\tcmpl\t$0," + tmpRegName(r))
-				println("\tje\t.L" + opd2)
-			case LABEL(opd1) =>
-			    println(".L" + opd1 + ":")
-			case JUMP(opd1) =>
-			    println("\tjmp\t.L" + opd1)
-
-			case CALL(opd1, opd2, opds) =>
-				saveAllRegs()
-				println("\tcall\t" + opds)
-				if (opd1 >= 0) {
-					assignReg(opd1, REG_AX)
-					println("\tadd $" + (opd2 * 4) + ",%esp")
-				}
-			case ARG(opd1) =>
-				val r = useReg(opd1)
-				freeReg(r)
-				println("\tpushl " + tmpRegName(r))
-			case RET(opd1) =>
-				val r = useReg(opd1)
-				freeReg(r)
-				if (r != REG_AX) {
-					println("\tmovl\t" + tmpRegName(r) + ",%eax")
-				}
-				println("\tjmp .L" + ret_lab)
-
-			case ADD(opd1, opd2, opd3) =>
-				val r1 = useReg(opd2)
-				val r2 = useReg(opd3)
-				freeReg(r1)
-				freeReg(r2)
-				if (opd1 >= 0) {
-					assignReg(opd1,r1)
-					println("\taddl\t" + tmpRegName(r2) + "," + tmpRegName(r1))
-				}
-			case SUB(opd1, opd2, opd3) =>
-				val r1 = useReg(opd2)
-				val r2 = useReg(opd3)
-				freeReg(r1)
-				freeReg(r2)
-				if (opd1 >= 0) {
-					assignReg(opd1, r1)
-					println("\tsubl\t" + tmpRegName(r2) + "," + tmpRegName(r1))
-				}
-			case MUL(opd1, opd2, opd3) =>
-				val r1 = useReg(opd2)
-				val r2 = useReg(opd3)
-				freeReg(r1)
-				freeReg(r2)
-				if (opd1 >= 0) {
-					assignReg(opd1, REG_AX)
-					saveReg(REG_DX)
-					if(r1 != REG_AX) {
-						println("\tmovl " + tmpRegName(r1) + "," + tmpRegName(REG_AX))
-					}
-					println("\timull\t" + tmpRegName(r2) + "," + tmpRegName(REG_AX))
-				}
-			case LT(opd1, opd2, opd3) =>
-				val r1 = useReg(opd2)
-				val r2 = useReg(opd3)
-				freeReg(r1)
-				freeReg(r2)
-				if (opd1 >= 0) {
-					val r = getReg(opd1)
-					val l1 = label_counter
-					label_counter += 1
-					val l2 = label_counter
-					label_counter += 1
-					println("\tcmpl\t" + tmpRegName(r2) + "," + tmpRegName(r1))
-					println("\tjl .L" + l1)
-					println("\tmovl\t$0," + tmpRegName(r))
-					println("\tjmp .L" + l2);
-					println(".L" + l1 + ":\tmovl\t$1," + tmpRegName(r))
-					print(".L" + l2 + ":")
-				}
-			case GT(opd1, opd2, opd3) =>
-				val r1 = useReg(opd2)
-				val r2 = useReg(opd3)
-			    freeReg(r1)
-			    freeReg(r2)
-			    if (opd1 >= 0) {
-					val r = getReg(opd1)
-					val l1 = label_counter
-					label_counter += 1
-					val l2 = label_counter
-					label_counter += 1
-
-					println("\tcmpl\t" + tmpRegName(r2) + "," + tmpRegName(r1))
-					println("\tjg .L" + l1)
-					println("\tmovl\t$0," + tmpRegName(r))
-					println("\tjmp .L" + l2)
-					println(".L" + l1 + ":\tmovl\t$1," + tmpRegName(r))
-					print(".L" + l2 + ":")
-				}
-			case PRINTLN(opd1, opd2) =>
-				val r = useReg(opd1); freeReg(r)
-				println("\tpushl\t" + tmpRegName(r))
-				println("\tpushl\t$.LC" + opd2)
-				saveAllRegs()
-				println("\tcall\tprintln")
-				println("\taddl\t$8,%esp")
+		codes foreach {
+		case LOADI(opd1, opd2) =>
+			if(opd1 >= 0) {
+				val r = getReg(opd1);
+				println("\tmovl\t$" + opd2 + ","+ tmpRegName(r))
 			}
+		case LOADA(opd1, opd2) =>	// load arg
+		    if(opd1 >= 0) {
+				val r = getReg(opd1);
+				println("\tmovl\t" + ARG_OFF(opd2) + "(%ebp)," + tmpRegName(r));
+			}
+		case LOADL(opd1, opd2) =>	// load local
+			if(opd1 >= 0) {
+				val r = getReg(opd1)
+				println("\tmovl\t" + LOCAL_VAR_OFF(opd2) + "(%ebp)," + tmpRegName(r))
+			}
+		case STOREA(opd1, opd2) =>	// store arg
+			val r = useReg(opd1)
+			freeReg(r)
+			println("\tmovl\t" + tmpRegName(r) + "," + ARG_OFF(opd2) + "(%ebp)")
+		case STOREL(opd1, opd2) =>	// store local
+			val r = useReg(opd1)
+			freeReg(r)
+			println("\tmovl\t" + tmpRegName(r) + "," + LOCAL_VAR_OFF(opd2) + "(%ebp)")
+		case BEQ0(opd1, opd2) => // conditional branch
+			val r = useReg(opd1)
+			freeReg(r)
+			println("\tcmpl\t$0," + tmpRegName(r))
+			println("\tje\t.L" + opd2)
+		case LABEL(opd1) =>
+		    println(".L" + opd1 + ":")
+		case JUMP(opd1) =>
+		    println("\tjmp\t.L" + opd1)
+
+		case CALL(opd1, opd2, opds) =>
+			saveAllRegs()
+			println("\tcall\t" + opds)
+			if (opd1 >= 0) {
+				assignReg(opd1, REG_AX)
+				println("\tadd $" + (opd2 * 4) + ",%esp")
+			}
+		case ARG(opd1) =>
+			val r = useReg(opd1)
+			freeReg(r)
+			println("\tpushl " + tmpRegName(r))
+		case RET(opd1) =>
+			val r = useReg(opd1)
+			freeReg(r)
+			if (r != REG_AX) {
+				println("\tmovl\t" + tmpRegName(r) + ",%eax")
+			}
+			println("\tjmp .L" + ret_lab)
+
+		case ADD(opd1, opd2, opd3) =>
+			val r1 = useReg(opd2)
+			val r2 = useReg(opd3)
+			freeReg(r1)
+			freeReg(r2)
+			if (opd1 >= 0) {
+				assignReg(opd1,r1)
+				println("\taddl\t" + tmpRegName(r2) + "," + tmpRegName(r1))
+			}
+		case SUB(opd1, opd2, opd3) =>
+			val r1 = useReg(opd2)
+			val r2 = useReg(opd3)
+			freeReg(r1)
+			freeReg(r2)
+			if (opd1 >= 0) {
+				assignReg(opd1, r1)
+				println("\tsubl\t" + tmpRegName(r2) + "," + tmpRegName(r1))
+			}
+		case MUL(opd1, opd2, opd3) =>
+			val r1 = useReg(opd2)
+			val r2 = useReg(opd3)
+			freeReg(r1)
+			freeReg(r2)
+			if (opd1 >= 0) {
+				assignReg(opd1, REG_AX)
+				saveReg(REG_DX)
+				if(r1 != REG_AX) {
+					println("\tmovl " + tmpRegName(r1) + "," + tmpRegName(REG_AX))
+				}
+				println("\timull\t" + tmpRegName(r2) + "," + tmpRegName(REG_AX))
+			}
+		case LT(opd1, opd2, opd3) =>
+			val r1 = useReg(opd2)
+			val r2 = useReg(opd3)
+			freeReg(r1)
+			freeReg(r2)
+			if (opd1 >= 0) {
+				val r = getReg(opd1)
+				val l1 = label_counter
+				label_counter += 1
+				val l2 = label_counter
+				label_counter += 1
+				println("\tcmpl\t" + tmpRegName(r2) + "," + tmpRegName(r1))
+				println("\tjl .L" + l1)
+				println("\tmovl\t$0," + tmpRegName(r))
+				println("\tjmp .L" + l2);
+				println(".L" + l1 + ":\tmovl\t$1," + tmpRegName(r))
+				print(".L" + l2 + ":")
+			}
+		case GT(opd1, opd2, opd3) =>
+			val r1 = useReg(opd2)
+			val r2 = useReg(opd3)
+		    freeReg(r1)
+		    freeReg(r2)
+		    if (opd1 >= 0) {
+				val r = getReg(opd1)
+				val l1 = label_counter
+				label_counter += 1
+				val l2 = label_counter
+				label_counter += 1
+
+				println("\tcmpl\t" + tmpRegName(r2) + "," + tmpRegName(r1))
+				println("\tjg .L" + l1)
+				println("\tmovl\t$0," + tmpRegName(r))
+				println("\tjmp .L" + l2)
+				println(".L" + l1 + ":\tmovl\t$1," + tmpRegName(r))
+				print(".L" + l2 + ":")
+			}
+		case PRINTLN(opd1, opd2) =>
+			val r = useReg(opd1); freeReg(r)
+			println("\tpushl\t" + tmpRegName(r))
+			println("\tpushl\t$.LC" + opd2)
+			saveAllRegs()
+			println("\tcall\tprintln")
+			println("\taddl\t$8,%esp")
 		}
 
 		// return sequence

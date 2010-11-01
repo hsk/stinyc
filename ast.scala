@@ -1,8 +1,8 @@
-package stinyc;
-import scala.collection.mutable.Map;
+package stinyc
+import scala.collection.mutable.Map
 
-	object Ast extends Ast
- class Ast {
+object Ast extends Ast
+class Ast {
 	case class SymbolC(var name:String) {
 		var vl:Int = 0
 		var array:Array[Int] = null
