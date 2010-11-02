@@ -5,3 +5,25 @@ Tiny-CコンパイラをScalaに移植してみるプロジェクトです。
 オリジナルのTiny-Cの講義のURLはこちら
 
 http://www.hpcs.cs.tsukuba.ac.jp/~msato/lecture-note/comp-lecture/
+
+
+◆インストール方法
+
+jdkをインストール
+scala 2.8をインストール
+
+byaccjをインストール
+
+STinyCはbyaccを使用していますので、こちらからダウンロードしてパスの通っているところに置いてください。
+http://byaccj.sourceforge.net/
+
+
+mk.batを実行すればﾒｲｸできます。
+
+◆実行方法
+
+インタプリタ
+scala stinyc.InterP test.c
+
+コンパイル
+scala stinyc.Main test.c
