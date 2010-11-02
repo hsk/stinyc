@@ -575,18 +575,7 @@ object Main extends Parser {
 }
 
 object asm {
-	/**
-	 * 文字列
-	 */
-	def _string(r1:String) {
-		println("\t.string \"" + r1 + "\"")
-	}
-	/**
-	 * セクション
-	 */
-	def _section(r1:String) {
-		println("\t.section\t" + r1)
-	}
+
 	/**
 	 * テキスト
 	 */
@@ -611,6 +600,19 @@ object asm {
 	def _type(r1:String, r2:String) {
 		println("\t.type\t" + r1 + "," + r2)
 	}
+	/**
+	 * セクション
+	 */
+	def _section(r1:String) {
+		println("\t.section\t" + r1)
+	}
+	/**
+	 * 文字列
+	 */
+	def _string(r1:String) {
+		println("\t.string \"" + r1 + "\"")
+	}
+
 	/**
 	 * ラベル
 	 */
