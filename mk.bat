@@ -5,5 +5,4 @@ copy Parser.java stinyc\.
 copy ParserVal.java stinyc\.
 javac -classpath "C:\Program Files\Scala\lib\scala-library.jar;." stinyc/CLex.java stinyc/Parser.java stinyc/ParserVal.java
 call scalac interp.scala
-call scalac x86_code_gen.scala
-
+call scalac compiler.scala

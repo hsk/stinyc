@@ -19,34 +19,34 @@
 %left '+' '-'
 %left '*'
 
+%type <obj> program external_definitions external_definition 
 %type <obj> parameter_list block local_vars symbol_list 
 %type <obj> statements statement expr primary_expr arg_list
 %type <obj> SYMBOL
 %type <ival> NUMBER
 %type <sval> STRING
-
 %start program
 
 %%
 
-program: /* empty */
-	| external_definitions
+program: /* empty */ { $$ = program((scala.List)null); }
+	| external_definitions { $$ = program((scala.List)reverse((scala.List)$1)); }
 	;
 
 external_definitions:
-	  external_definition
-	| external_definitions external_definition
+	  external_definition { $$ = list((ExternalDefinition)$1); }
+	| external_definitions external_definition { $$ = addList((ExternalDefinition)$2, (scala.List)$1); }
 	;
 
 external_definition:
 	  SYMBOL parameter_list block  /* fucntion definition */
-	{ defineFunction(getSymbol((AST)$1),(AST)$2,(AST)$3); }
+	{ $$ = new DefineFunction(getSymbol((AST)$1),(AST)$2,(AST)$3); }
 	| VAR SYMBOL ';'
-	{ declareVariable(getSymbol((AST)$2),null); }
+	{ $$ = new DeclareVariable(getSymbol((AST)$2),null); }
 	| VAR SYMBOL '=' expr ';'
-        { declareVariable(getSymbol((AST)$2),(AST)$4); }
+        { $$ = new DeclareVariable(getSymbol((AST)$2),(AST)$4); }
 	| VAR SYMBOL '[' expr ']' ';'
-	{ declareArray(getSymbol((AST)$2),(AST)$4); }
+	{ $$ = new DeclareArray(getSymbol((AST)$2),(AST)$4); }
 	;
 
 parameter_list:
@@ -164,20 +164,4 @@ arg_list:
   public static void main(String args[]) throws IOException {
     Parser yyparser = new Parser(new FileReader(args[0]));
     System.out.println(yyparser.yyparse());
-  }
-  public void declareArray(SymbolC sym, Ast.AST o){
-    System.out.println("declareArray");
-    System.out.println(sym);
-    System.out.println(o);
-  }
-  public void declareVariable(SymbolC sym, Ast.AST o){
-    System.out.println("declareVariable");
-    System.out.println(sym);
-    System.out.println(o);
-  }
-  public void defineFunction(SymbolC sym, Ast.AST o, Ast.AST o2){
-    System.out.println("defineFunction");
-    System.out.println(sym);
-    System.out.println(o);
-    System.out.println(o2);
   }

@@ -17,7 +17,7 @@ object InterP extends Parser {
 			env(i) = Environment(null, 0)
 		}
 	}
-	override def defineFunction(fsym:stinyc.Ast#SymbolC, params:Ast#AST, body:stinyc.Ast#AST) {
+	def readDefineFunction(fsym:stinyc.Ast#SymbolC, params:Ast#AST, body:stinyc.Ast#AST) {
 		fsym.setFuncParams(params.asInstanceOf[Ast.AST])
 		fsym.setFuncBody(body.asInstanceOf[Ast.AST])
 	}
@@ -151,8 +151,7 @@ object InterP extends Parser {
 	/**
 	 * global variable
 	 */
-	override def declareVariable(vsym:stinyc.Ast#SymbolC, init_value:stinyc.Ast#AST) {
-		println("declareVariable");
+	def readDeclareVariable(vsym:stinyc.Ast#SymbolC, init_value:stinyc.Ast#AST) {
 		if (init_value != null) {
 			vsym.vl = executeExpr(init_value.asInstanceOf[AST])
 		}
@@ -162,7 +161,7 @@ object InterP extends Parser {
 	/**
 	 * Array
 	 */
-	override def declareArray(a:stinyc.Ast#SymbolC, size:stinyc.Ast#AST) {
+	def readDeclareArray(a:stinyc.Ast#SymbolC, size:stinyc.Ast#AST) {
 		a.vl = arrays.length
 		arrays.push(new Array[Int](executeExpr(size.asInstanceOf[AST])))
 		
@@ -181,6 +180,8 @@ object InterP extends Parser {
 		var r = new FileReader(args(0));
 	    lexer = new CLex(r, this);
 		yyparse();
+		var prg = yyval.obj.asInstanceOf[Program]
+		readProgram(prg)
 		// execute main
 		println("execute main ...")
 		val r2 = executeCallFunc(getSymbol(makeSymbol("main")), null)
@@ -188,4 +189,18 @@ object InterP extends Parser {
 		println( r2)
 	}
 
+	def readProgram(prg:Program) {
+		prg match {
+		case null =>
+		case Program(p) => readExternalDefinitions(p)
+		}
+	}
+	def readExternalDefinitions(l:List[ExternalDefinition]) {
+		l match {
+		case List() =>
+		case DefineFunction(a,b,c)::xs => readDefineFunction(a, b, c); readExternalDefinitions(xs)
+		case DeclareVariable(a,b)::xs => readDeclareVariable(a, b); readExternalDefinitions(xs)
+		case DeclareArray(a,b)::xs => readDeclareArray(a, b); readExternalDefinitions(xs)
+		}
+	}
 }

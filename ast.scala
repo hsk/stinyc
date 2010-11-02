@@ -12,6 +12,17 @@ class Ast {
 		def setFuncBody(a:Ast.AST){func_body = a}
 	}
 
+	case class Program(l:List[ExternalDefinition])
+
+	sealed abstract class ExternalDefinition
+	case class DeclareArray(sym:SymbolC,o:AST) extends ExternalDefinition
+	case class DeclareVariable(sym:SymbolC,o:AST) extends ExternalDefinition
+	case class DefineFunction(sym:SymbolC,o:AST, o2:AST) extends ExternalDefinition
+
+	def list(p:ExternalDefinition):List[ExternalDefinition] = List(p)
+	def addList(p:ExternalDefinition,l:List[ExternalDefinition]):List[ExternalDefinition] = p::l
+	def reverse(l:List[ExternalDefinition]):List[ExternalDefinition] = l.reverse
+	def program(l:List[ExternalDefinition]):Program = Program(l)
 	sealed abstract class AST
 	case class LIST(var l:AST,var r:AST) extends AST
 	case class NUM(vl:Int) extends AST
@@ -76,4 +87,5 @@ class Ast {
 		case _ => throw new Exception("bad access to symbol" + p)
 		}
 	}
+	
 }
