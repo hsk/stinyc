@@ -575,67 +575,132 @@ object Main extends Parser {
 }
 
 object asm {
+	/**
+	 * 文字列
+	 */
 	def _string(r1:String) {
 		println("\t.string \"" + r1 + "\"")
 	}
+	/**
+	 * セクション
+	 */
 	def _section(r1:String) {
 		println("\t.section\t" + r1)
 	}
+	/**
+	 * テキスト
+	 */
 	def _text() {
 		println("\t.text")
 	}
+	/**
+	 * アライン
+	 */
 	def _align(r1:Int) {
 		println("\t.align\t" + r1)
 	}
-
+	/**
+	 * グローバル
+	 */
 	def _globl(r1:String) {
 		println("\t.globl\t"+ r1)
 	}
+	/**
+	 * タイプ
+	 */
 	def _type(r1:String, r2:String) {
 		println("\t.type\t" + r1 + "," + r2)
 	}
+	/**
+	 * ラベル
+	 */
 	def label(r1:String) {
 		println(r1 + ":")
 	}
+	/**
+	 * スタックにPUSH
+	 */
 	def pushl(r1:String) {
 		println("\tpushl\t" + r1)
 	}
+	/**
+	 * 掛け算
+	 */
 	def movl(r1:String, r2:String) {
 		println("\tmovl\t" + r1 + "," + r2)
 	}
-	def addl(r1:String, r2:String) {
-		println("\taddl\t" + r1 + "," + r2)
-	}
-	def subl(r1:String, r2:String) {
-		println("\tsubl\t" + r1 + "," + r2)
-	}
-	def cmpl(r1:String, r2:String) {
-		println("\tcmpl\t" + r1 + "," + r2)
-	}
-	def je(r1:String) {
-		println("\tje\t" + r1)
-	}
-	def jl(r1:String) {
-		println("\tjl\t" + r1)
-	}
-	def jg(r1:String) {
-		println("\tjg\t" + r1)
-	}
-	def jmp(r1:String) {
-		println("\tjmp\t" + r1)
-	}
-	def call(opds:String) {
-		println("\tcall\t" + opds)
-	}
+	/**
+	 * 足し算
+	 */
 	def add(r1:String, r2:String) {
 		println("\tadd " + r1 + "," + r2)
 	}
+	/**
+	 * 書け算
+	 */
 	def imull(r1:String, r2:String) {
 		println("\timull\t" + r1 + "," + r2)
 	}
+	/**
+	 * 足し算
+	 */
+	def addl(r1:String, r2:String) {
+		println("\taddl\t" + r1 + "," + r2)
+	}
+	/**
+	 * 引き算
+	 */
+	def subl(r1:String, r2:String) {
+		println("\tsubl\t" + r1 + "," + r2)
+	}
+	/**
+	 * 比較
+	 */
+	def cmpl(r1:String, r2:String) {
+		println("\tcmpl\t" + r1 + "," + r2)
+	}
+	/**
+	 * equalだったらjump
+	 */
+	def je(r1:String) {
+		println("\tje\t" + r1)
+	}
+	/**
+	 * 小さかったらjump
+	 */
+	def jl(r1:String) {
+		println("\tjl\t" + r1)
+	}
+	/**
+	 * 大きかったらjump
+	 */
+	def jg(r1:String) {
+		println("\tjg\t" + r1)
+	}
+	/**
+	 * 無条件jump
+	 */
+	def jmp(r1:String) {
+		println("\tjmp\t" + r1)
+	}
+
+	/**
+	 * 関数呼び出し
+	 */
+	def call(opds:String) {
+		println("\tcall\t" + opds)
+	}
+
+	/**
+	 * 関数終了処理
+	 */
 	def leave() {
 		println("\tleave")
 	}
+
+	/**
+	 * 関数リターン
+	 */
 	def ret() {
 		println("\tret")
 	}
