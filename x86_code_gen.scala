@@ -407,10 +407,10 @@ object Main extends Parser {
 	def genFuncCode(entry_name:String, n_local:Int) {
 
 		// function header
-		asm.text()
-		asm.align(4)
-		asm.globl(entry_name)
-		asm.type(entry_name, "@function")
+		asm._text()
+		asm._align(4)
+		asm._globl(entry_name)
+		asm._type(entry_name, "@function")
 		asm.label(entry_name)
 		
 		asm.pushl("%ebp")
@@ -420,7 +420,7 @@ object Main extends Parser {
 		val ret_lab = label_counter
 		label_counter += 1
 
-		asm.subl("$" . frame_size, "%esp")
+		asm.subl("$" + frame_size, "%esp")
 		asm.movl("%ebx", "-4(%ebp)")
 
 		initTmpReg()
@@ -567,29 +567,35 @@ object Main extends Parser {
 	def genString(s:String):Int = {
 		val l = label_counter
 		label_counter += 1
-		println("\t.section\t.rodata")
-		println(".LC" + l + ":")
-		println("\t.string \"" + s + "\"")
+		asm._section(".rodata")
+		asm.label(".LC" + l)
+		asm._string(s)
 		l
 	}
 }
 
 object asm {
-	def text() {
+	def _string(r1:String) {
+		println("\t.string \"" + r1 + "\"")
+	}
+	def _section(r1:String) {
+		println("\t.section\t" + r1)
+	}
+	def _text() {
 		println("\t.text")
 	}
-	def align(r1:Int) {
+	def _align(r1:Int) {
 		println("\t.align\t" + r1)
 	}
 
-	def globl(r1:String) {
-		println("\t.globl\t"+ r1)					// .globl <name>
+	def _globl(r1:String) {
+		println("\t.globl\t"+ r1)
 	}
-	def type(r1:String, r2:String) {
+	def _type(r1:String, r2:String) {
 		println("\t.type\t" + r1 + "," + r2)
 	}
 	def label(r1:String) {
-		println(r1 + ":")							// <name>:
+		println(r1 + ":")
 	}
 	def pushl(r1:String) {
 		println("\tpushl\t" + r1)
