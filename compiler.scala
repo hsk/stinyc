@@ -47,6 +47,7 @@ object Compiler extends Parser {
 		lexer = new CLex(r, this);
 		yyparse()
 		var prg = yyval.obj.asInstanceOf[Program]
+		println(prg)
 		compileProgram(prg)
 	}
 
@@ -296,7 +297,13 @@ object Compiler extends Parser {
 			tmp_counter += 1
 			compileExpr(r, getNth(args, 1))
 			genCode(PRINTLN(r, l))
-		case _ => throw new Exception("println param error")
+		case LIST(SYM(SymbolC(a)),b) =>
+			val l = genString(a)
+			val r = tmp_counter
+			tmp_counter += 1
+			compileExpr(r, getNth(args, 1))
+			genCode(PRINTLN(r, l))
+		case _ => throw new Exception("println param error" + args)
 		}
 	}
 
@@ -724,3 +731,4 @@ object asm {
 		println("\tret")
 	}
 }
+

@@ -55,7 +55,6 @@ class Ast {
 		case _ => throw new Exception("bad access to list")
 		}
 	}
-
 	def addLast(l:AST, p:AST):AST = {
 		l match {
 		case null => LIST(p, null)
