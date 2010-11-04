@@ -4,6 +4,12 @@
 package stinyc
 import scala.collection.mutable.Stack
 import java.io.FileReader
+import java.io.FileWriter
+import java.io.PrintWriter
+import java.io.BufferedWriter
+import java.io.BufferedReader
+import java.io.InputStreamReader
+import java.io.IOException
 
 /*
  * register machine intermediate opcode
@@ -51,12 +57,45 @@ object Compiler extends Parser {
 		compileProgram(prg)
 	}
 
+
 	def compileProgram(prg:Program) {
+		val outchan = new FileWriter("output.s")
+		asm.p = new PrintWriter(new BufferedWriter(outchan))
 		prg match {
 		case null =>
 		case Program(p) => compileExternalDefinitions(p)
 		}
+		asm.p.close()
+		gcc("output.s", "a.exe")
 	}
+	def gcc(file:String, out:String):Unit = {
+		try {
+			var rt = Runtime.getRuntime()
+			var p = rt.exec("gcc -o "+out+" "+file+" println.c")
+			var br = new BufferedReader(new InputStreamReader(p.getInputStream()))
+			var result:String = ""
+			while (result != null) {
+				result = br.readLine()
+				if(result != null) {
+					System.out.println(result)
+				}
+			}
+			br = new BufferedReader(new InputStreamReader(p.getErrorStream()))
+			result = ""
+			while (result != null) {
+				result = br.readLine()
+				if(result != null) {
+					System.out.println(result)
+				}
+			}
+
+			p.waitFor();
+		} catch {
+			case ex:IOException =>
+				ex.printStackTrace()
+		}
+	}
+
 	def compileExternalDefinitions(l:List[ExternalDefinition]) {
 		l match {
 		case List() =>
@@ -433,9 +472,9 @@ object Compiler extends Parser {
 		// function header
 		asm._text()
 		asm._align(4)
-		asm._globl(entry_name)
-		asm._type(entry_name, "@function")
-		asm.label(entry_name)
+		asm._globl("_" + entry_name)
+		// asm._type(entry_name, "@function")
+		asm.label("_" + entry_name)
 		
 		asm.pushl("%ebp")
 		asm.movl("%esp", "%ebp")
@@ -485,7 +524,7 @@ object Compiler extends Parser {
 
 		case CALL(opd1, opd2, opds) =>
 			saveAllRegs()
-			asm.call(opds)
+			asm.call("_" + opds)
 			if (opd1 >= 0) {
 				assignReg(opd1, REG_AX)
 				asm.add("$" + (opd2 * 4), "%esp")
@@ -577,7 +616,7 @@ object Compiler extends Parser {
 			asm.pushl(tmpRegName(r))
 			asm.pushl("$.LC" + opd2)
 			saveAllRegs()
-			asm.call("println")
+			asm.call("_println")
 			asm.addl("$8", "%esp")
 		}
 
@@ -599,136 +638,137 @@ object Compiler extends Parser {
 }
 
 object asm {
-
+	var p:PrintWriter = null
+	
 	/**
 	 * テキスト
 	 */
 	def _text() {
-		println("\t.text")
+		p.println("\t.text")
 	}
 	/**
 	 * アライン
 	 */
 	def _align(r1:Int) {
-		println("\t.align\t" + r1)
+		p.println("\t.align\t" + r1)
 	}
 	/**
 	 * グローバル
 	 */
 	def _globl(r1:String) {
-		println("\t.globl\t"+ r1)
+		p.println("\t.globl\t"+ r1)
 	}
 	/**
 	 * タイプ
 	 */
 	def _type(r1:String, r2:String) {
-		println("\t.type\t" + r1 + "," + r2)
+		p.println("\t.type\t" + r1 + "," + r2)
 	}
 	/**
 	 * セクション
 	 */
 	def _section(r1:String) {
-		println("\t.section\t" + r1)
+		p.println("\t.section\t" + r1)
 	}
 	/**
 	 * 文字列
 	 */
 	def _string(r1:String) {
-		println("\t.string \"" + r1 + "\"")
+		p.println("\t.string \"" + r1 + "\"")
 	}
 
 	/**
 	 * ラベル
 	 */
 	def label(r1:String) {
-		println(r1 + ":")
+		p.println(r1 + ":")
 	}
 	/**
 	 * スタックにPUSH
 	 */
 	def pushl(r1:String) {
-		println("\tpushl\t" + r1)
+		p.println("\tpushl\t" + r1)
 	}
 	/**
 	 * 掛け算
 	 */
 	def movl(r1:String, r2:String) {
-		println("\tmovl\t" + r1 + "," + r2)
+		p.println("\tmovl\t" + r1 + "," + r2)
 	}
 	/**
 	 * 足し算
 	 */
 	def add(r1:String, r2:String) {
-		println("\tadd " + r1 + "," + r2)
+		p.println("\tadd " + r1 + "," + r2)
 	}
 	/**
 	 * 書け算
 	 */
 	def imull(r1:String, r2:String) {
-		println("\timull\t" + r1 + "," + r2)
+		p.println("\timull\t" + r1 + "," + r2)
 	}
 	/**
 	 * 足し算
 	 */
 	def addl(r1:String, r2:String) {
-		println("\taddl\t" + r1 + "," + r2)
+		p.println("\taddl\t" + r1 + "," + r2)
 	}
 	/**
 	 * 引き算
 	 */
 	def subl(r1:String, r2:String) {
-		println("\tsubl\t" + r1 + "," + r2)
+		p.println("\tsubl\t" + r1 + "," + r2)
 	}
 	/**
 	 * 比較
 	 */
 	def cmpl(r1:String, r2:String) {
-		println("\tcmpl\t" + r1 + "," + r2)
+		p.println("\tcmpl\t" + r1 + "," + r2)
 	}
 	/**
 	 * equalだったらjump
 	 */
 	def je(r1:String) {
-		println("\tje\t" + r1)
+		p.println("\tje\t" + r1)
 	}
 	/**
 	 * 小さかったらjump
 	 */
 	def jl(r1:String) {
-		println("\tjl\t" + r1)
+		p.println("\tjl\t" + r1)
 	}
 	/**
 	 * 大きかったらjump
 	 */
 	def jg(r1:String) {
-		println("\tjg\t" + r1)
+		p.println("\tjg\t" + r1)
 	}
 	/**
 	 * 無条件jump
 	 */
 	def jmp(r1:String) {
-		println("\tjmp\t" + r1)
+		p.println("\tjmp\t" + r1)
 	}
 
 	/**
 	 * 関数呼び出し
 	 */
 	def call(opds:String) {
-		println("\tcall\t" + opds)
+		p.println("\tcall\t" + opds)
 	}
 
 	/**
 	 * 関数終了処理
 	 */
 	def leave() {
-		println("\tleave")
+		p.println("\tleave")
 	}
 
 	/**
 	 * 関数リターン
 	 */
 	def ret() {
-		println("\tret")
+		p.println("\tret")
 	}
 }
 
